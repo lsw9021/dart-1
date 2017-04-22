@@ -21,9 +21,11 @@ matrix:
     - os: osx
       compiler: clang
       env: BUILD_TYPE=Debug COVERALLS=OFF COMPILER=CLANG
+      rvm: system
     - os: osx
       compiler: clang
       env: BUILD_TYPE=Release COVERALLS=OFF COMPILER=CLANG
+      rvm: system
 
 install:
   - 'ci/install.sh'
