@@ -1,28 +1,25 @@
 # Specify version format
 version: "{build}"
 
-# Operating system (build VM template)
-os: Visual Studio 2015
-
-# build platform, i.e. Win32 (instead of x86), x64, Any CPU. This setting is optional.
-platform: 
-  - Win32
-  #- x64  Disable build for x64 machine until x64 version of dart-prerequisites is ready
-
 # specify custom environment variables
 environment:
   MSVC_DEFAULT_OPTIONS: ON
-  BOOST_ROOT: C:\Libraries\boost_1_59_0
-  BOOST_LIBRARYDIR: C:\Libraries\boost_1_59_0\lib32-msvc-14.0
   BUILD_EXAMPLES: OFF  # don't build examples to not exceed allowed build time (40 min)
   BUILD_TUTORIALS: OFF  # don't build tutorials to not exceed allowed build time (40 min)
+  CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE="C:\tools\vcpkg\scripts\buildsystems\vcpkg.cmake"
+  BUILD_CORE_ONLY: ON
   matrix:
-  - BUILD_CORE_ONLY: ON
-  - BUILD_CORE_ONLY: OFF
-
+    - image: Visual Studio 2017
+      platform: x64
+      CMAKE_GENERATOR: -G"Visual Studio 15 2017 Win64"
+  
+    - image: Visual Studio 2015
+      platform: x64
+      CMAKE_GENERATOR: -G"Visual Studio 15 2015 Win64"
+      
 # build configuration, i.e. Debug, Release, etc.
 configuration:
-  - Debug
+  #- Debug
   - Release
 
 # scripts that are called at very beginning, before repo cloning
@@ -33,40 +30,45 @@ init:
 # clone directory
 clone_folder: C:\projects\dart
 
-# branches to build
-branches:
-  # whitelist
-  # only: 
-  #   - master
-  # blacklist
-  except:
-    - gh-pages
-
 # scripts that run after cloning repository
 install:
-  - ps: cd C:\projects\dart\ci
-  - ps: .\appveyor_install.ps1
+  - if "%platform%"=="Win32" set VCPKG_ARCH=x86-windows
+  - if "%platform%"=="x64"   set VCPKG_ARCH=x64-windows
+  
+  # install pacakges
+  # ---- required dependencies: boost, eigen3, libccd, fcl, assimp
+  - vcpkg install boost:%VCPKG_ARCH%
+  - vcpkg install eigen3:%VCPKG_ARCH%
+  - vcpkg install ccd:%VCPKG_ARCH%
+  - vcpkg install fcl:%VCPKG_ARCH%
+  - vcpkg install assimp:%VCPKG_ARCH%
+  # ---- optional dependencies: nlopt, ipopt, bullet3, ode, flann, tinyxml2, urdfdom_headers, urdfdom, opengl, freeglut, osg
+  #- vcpkg install nlopt:%VCPKG_ARCH%
+  #- vcpkg install ipopt:%VCPKG_ARCH%
+  #- vcpkg install bullet3:%VCPKG_ARCH%
+  #- vcpkg install ode:%VCPKG_ARCH%
+  #- vcpkg install flann:%VCPKG_ARCH%
+  #- vcpkg install tinyxml2:%VCPKG_ARCH%
+  #- vcpkg install urdfdom_headers:%VCPKG_ARCH%
+  #- vcpkg install urdfdom:%VCPKG_ARCH%
+  #- vcpkg install opengl:%VCPKG_ARCH%
+  #- vcpkg install freeglut:%VCPKG_ARCH%
+  #- vcpkg install osg:%VCPKG_ARCH%
+  
+  - vcpkg integrate install
+  
 
 # scripts to run before build
 before_build:
-  - cmd: if "%platform%"=="Win32" set CMAKE_GENERATOR_NAME=Visual Studio 14 2015
-  - cmd: if "%platform%"=="x64"   set CMAKE_GENERATOR_NAME=Visual Studio 14 2015 Win64
-  - cmd: if "%platform%"=="Win32" set PROGRAM_FILES_PATH=Program Files (x86)
-  - cmd: if "%platform%"=="x64"   set PROGRAM_FILES_PATH=Program Files
-  - cmd: if not exist "C:\%PROGRAM_FILES_PATH%\flann\include\flann\flann.hpp" (
-            curl -L -o flann-1.9.1.tar.gz https://github.com/mariusmuja/flann/archive/1.9.1.tar.gz &&
-            cmake -E tar zxf flann-1.9.1.tar.gz &&
-            cd flann-1.9.1 &&
-            md build &&
-            cd build &&
-            cmake -G "%CMAKE_GENERATOR_NAME%" -DCMAKE_BUILD_TYPE=%Configuration% .. &&
-            cmake --build . --target install --config %Configuration% &&
-            cd ..\..
-         ) else (echo Using cached flann)
   - cmd: cd C:\projects\dart
   - cmd: md build
   - cmd: cd build
-  - cmd: cmake -G "%CMAKE_GENERATOR_NAME%" -DCMAKE_BUILD_TYPE=%configuration% -DBUILD_CORE_ONLY="%BUILD_CORE_ONLY%" -DDART_BUILD_EXAMPLES="%BUILD_EXAMPLES%" -DDART_BUILD_TUTORIALS="%BUILD_TUTORIALS%" -DBOOST_ROOT="%BOOST_ROOT%" -DBOOST_LIBRARYDIR="%BOOST_LIBRARYDIR%" -DBoost_USE_STATIC_LIBS="ON" -Durdfdom_DIR="%urdfdom_DIR%" -Durdfdom_headers_DIR="%urdfdom_headers_DIR%" -DDART_MSVC_DEFAULT_OPTIONS="%MSVC_DEFAULT_OPTIONS%" -DFLANN_INCLUDE_DIRS="C:\%PROGRAM_FILES_PATH%\flann\include" -DFLANN_LIBRARIES="C:\%PROGRAM_FILES_PATH%\flann\lib\flann_cpp_s.lib" ..
+  - cmd: cmake %CMAKE_GENERATOR% -DCMAKE_BUILD_TYPE=%configuration% -DBUILD_CORE_ONLY="%BUILD_CORE_ONLY%" -DDART_BUILD_EXAMPLES="%BUILD_EXAMPLES%" -DDART_BUILD_TUTORIALS="%BUILD_TUTORIALS%" -DDART_MSVC_DEFAULT_OPTIONS="%MSVC_DEFAULT_OPTIONS%" %CMAKE_TOOLCHAIN_FILE% ..
+
+# preserve contents of selected directories and files across project builds
+cache:
+  - C:\tools\vcpkg\installed -> .appveyor.yml
+  - C:\tools\vcpkg\packages -> .appveyor.yml
 
 build:
   project: C:\projects\dart\build\dart.sln # path to Visual Studio solution or project
