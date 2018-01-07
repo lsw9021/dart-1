@@ -3,8 +3,6 @@ brew tap dartsim/dart
 brew update > /dev/null
 
 PACKAGES='
-git
-cmake
 assimp
 fcl
 bullet
